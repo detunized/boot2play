@@ -42,6 +42,8 @@ bootstrap:
 %error "The bootstrap code must start at 0x3E"
 %endif
 
+; TODO: set up the registers and the stack
+
 mov ax, 0xB800
 mov es, ax
 
