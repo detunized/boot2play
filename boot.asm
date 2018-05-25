@@ -47,11 +47,11 @@ bootstrap:
 mov ax, 0xB800
 mov es, ax
 
-mov al, 'X'
+mov al, 0xA9
 mov ah, 0xCF
 mov bx, 39
 mov cx, 12
-call put_char
+call put_hex_byte
 
 jmp $
 
@@ -68,6 +68,37 @@ put_char:
     add bx, cx ; bx = x * 2 + y * (32 + 128)
     mov [es:bx], ax
     ret
+
+; AL: nibble (upper 4 bits must be zero)
+; AH: attr
+; BX: x
+; CX: y
+; ES: 0xB800
+put_hex_nibble:
+    add al, '0'
+    cmp al, '9'
+    jle .call_put_char
+    add al, 'A' - '0' - 10
+.call_put_char:
+    jmp put_char ; tail call
+
+; AL: byte
+; AH: attr
+; BX: x
+; CX: y
+; ES: 0xB800
+put_hex_byte:
+    push cx
+    push bx
+    push ax
+    shr al, 4
+    call put_hex_nibble
+    pop ax
+    and al, 0x0F
+    pop bx
+    inc bx
+    pop cx
+    jmp put_hex_nibble ; tail call
 
 times 510 - ($ - $$) db 0
 db 0x55
