@@ -2,12 +2,16 @@
 
 ; Entry point
 jmp bootstrap
-nop
+
+; We have one byte unused, usually it's a nop instruction.
+; But since 'boot2play' doesn't fit into the OEM name field in
+; the BIOS parameter block, we can make a little trick here.
+db 'b'
 
 ; See http://www.ntfs.com/fat-partition-sector.htm
 ; See https://www.win.tue.nl/~aeb/linux/fs/fat/fat-1.html
 
-db 'bootplay' ; OEM name
+db 'oot2play' ; OEM name
 
 ; Extended BIOS parameter block
 dw 512           ; number of bytes per sector
@@ -33,6 +37,7 @@ db 'FAT12   '    ; file system type
 ; The actual bootstrap code starts here
 bootstrap:
 
+; Make sure the
 %if bootstrap - $$ != 0x3E
 %error "The bootstrap code must start at 0x3E"
 %endif
