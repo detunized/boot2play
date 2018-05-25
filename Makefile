@@ -2,6 +2,8 @@ MAKEFLAGS += --silent
 
 .PHONY: run
 run: run-requirements build
+	echo "Launching QEMU (usually starts in the background)"
+	echo "Press Ctrl-C to quit"
 	qemu-system-i386 -drive file=floppy.img,format=raw,if=floppy,index=0
 
 .PHONY: build
