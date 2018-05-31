@@ -4,7 +4,18 @@ MAKEFLAGS += --silent
 run: run-requirements build
 	echo "Launching QEMU (usually starts in the background)"
 	echo "Press Ctrl-C to quit"
-	qemu-system-i386 -drive file=floppy.img,format=raw,if=floppy,index=0
+	qemu-system-i386 -drive file=floppy.img,format=raw,if=floppy,index=0 -boot a -nographic -curses
+
+run-ui: run-requirements build
+	echo "Launching QEMU (usually starts in the background)"
+	echo "Press Ctrl-C to quit"
+	qemu-system-i386 -drive file=floppy.img,format=raw,if=floppy,index=0 -boot a
+
+debug: run-requirements build
+	echo "Launching QEMU (usually starts in the background)"
+	echo "Connect with gdb: gdb -ex 'set arch i8086' -ex 'target remote localhost:1234' -ex 'br *0x7c3e'"
+	echo "Press Ctrl-C to quit"
+	qemu-system-i386 -drive file=floppy.img,format=raw,if=floppy,index=0 -boot a -s -S
 
 .PHONY: build
 build: build-requirements floppy.img
