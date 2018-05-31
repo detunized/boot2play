@@ -60,7 +60,6 @@ bootstrap:
 ; Set up DS to 07C0:0000. It's also possible to use 0000:7C00
 ; but then we would need to offset this code via ORG.
 ; Next 8kb after this boot sector is the stack 07E0:0000-07E0:1FFF
-
 cli
 mov ax, 0x07C0
 mov ds, ax
@@ -68,6 +67,9 @@ mov ax, 0x07E0
 mov ss, ax
 mov sp, 8192
 sti
+
+; On boot the boot drive index is stored in DL
+mov [boot_drive], dl
 
 ; FS is 0xB800 through out the entire program
 mov ax, 0xB800
@@ -215,6 +217,8 @@ clear_screen:
     pop es
     pop cx
     ret
+
+boot_drive db 0
 
 times 510 - ($ - $$) db 0
 db 0x55
