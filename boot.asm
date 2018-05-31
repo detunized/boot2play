@@ -82,32 +82,17 @@ cld
 mov ax, 0x0720
 call clear_screen
 
-; Print memory dump of [0x00400, 0x00500)
-xor ax, ax
-mov ds, ax
+xor si, si
+mov bx, 0
+mov cx, 0
+mov ah, 0xF1
+call display_memory_dump_16x16
 
-mov bp, sp
-
-.screen:
-push 0
-
-.row:
-mov cx, [bp - 2]
-xor bx, bx
-mov dx, 16
-mov si, cx
-shl si, 4
-add si, 0x400
-mov ah, 0x0F
-call put_hex_string
-
-inc word [bp - 2]
-cmp word [bp - 2], 16
-jl .row
-
-pop ax
-
-jmp .screen
+mov si, 256
+mov bx, 34
+mov cx, 0
+mov ah, 0xF1
+call display_memory_dump_16x16
 
 ; Halt
 jmp $
@@ -202,6 +187,41 @@ put_hex_string:
     jmp .loop
 .done:
     pop di
+    ret
+
+; DS:SI: bytes
+; AH: attr
+; BX: x
+; CX: y
+; FS: 0xB800
+display_memory_dump_16x16:
+; Print memory dump of [0x00400, 0x00500)
+    push bp
+    mov bp, sp
+
+    push bx ; x:     bp - 2
+    push cx ; y:     bp - 4
+    push 0  ; row:   bp - 6
+    push si ; bytes: bp - 8
+    push ax ; attr:  bp - 10
+
+    .row:
+    mov bx, [bp - 2]; x
+    mov cx, [bp - 4]; y
+    add cx, [bp - 6]; y + row
+    mov dx, 16
+    mov si, [bp - 8]
+    mov ax, [bp - 10]
+    call put_hex_string
+
+    add word [bp - 8], 16
+
+    inc word [bp - 6]
+    cmp word [bp - 6], 16
+    jl .row
+
+    mov sp, bp
+    pop bp
     ret
 
 ; AL: char
