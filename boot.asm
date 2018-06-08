@@ -82,6 +82,37 @@ cld
 mov ax, 0x0720
 call clear_screen
 
+; Read drive parameters
+mov ah, 0x08
+mov dl, [boot_drive]
+xor di, di
+mov es, di
+int 0x13
+jc halt
+
+; Store disk parameters
+; DH contains the max head index, adding 1 to convert to count
+inc dh
+mov [num_heads], dh
+; CX contains both cylinders and sectors per track
+; Lower 6 bits contain number of sectors per track
+mov ax, cx
+and al, (1 << 6) - 1
+mov [num_sectors_per_track], al
+; Higher 8 bits contain lower 8 bits of max cylinder index
+; Bits 6 and 7 are the high order bits of max cylinder index
+; Adding 1 to convert to count
+ror cx, 8
+shr ch, 6
+inc cx
+mov [num_cylinders], cx
+
+mov ax, 0
+mov bx, 0x9E00
+mov es, bx
+xor bx, bx
+call read_linear_sector
+
 xor si, si
 mov bx, 0
 mov cx, 0
@@ -95,7 +126,8 @@ mov ah, 0xF1
 call display_memory_dump_16x16
 
 ; Halt
-jmp $
+halt:
+    jmp halt
 
 ; AL: char
 ; AH: attr
@@ -238,7 +270,15 @@ clear_screen:
     pop cx
     ret
 
+; AX: sector index
+; ES:BX: destination
+read_linear_sector:
+    ret
+
 boot_drive db 0
+num_heads db 0
+num_cylinders dw 0
+num_sectors_per_track db 0
 
 times 510 - ($ - $$) db 0
 db 0x55
