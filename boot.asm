@@ -273,14 +273,24 @@ clear_screen:
 
 ; AX: linear sector index
 ; ES:BX: destination
+; TODO: What happens when the index is too big?
+; TODO: In the current version cylinder index is always < 256.
 read_linear_sector:
-    ; TODO: convert linear index to CHS
+    push cx
+    push dx
+    div byte [num_sectors_per_track]
+    mov cl, ah ; linear_sector % num_sectors_per_track
+    inc cl     ; sectors start at 1
+    xor ah, ah
+    div byte [num_heads]
+    mov dh, ah ; linear_sector / num_sectors_per_track % num_heads
+    mov ch, al ; linear_sector / num_sectors_per_track / num_heads
     mov ah, 2
     mov al, 1 ; number of sectors
-    mov dh, 0
-    mov cx, 1
     mov dl, [boot_drive]
     int 0x13
+    pop dx
+    pop cx
     ret
 
 boot_drive db 0
