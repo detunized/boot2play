@@ -108,18 +108,19 @@ inc cx
 mov [num_cylinders], cx
 
 mov ax, 0
-mov bx, 0x9E00
+mov bx, 0x09E0
 mov es, bx
 xor bx, bx
 call read_linear_sector
+jc halt
 
-xor si, si
+mov si, 0x2200 ; 09E0:0000 = 07C0:2200 = ds:2200
 mov bx, 0
 mov cx, 0
 mov ah, 0xF1
 call display_memory_dump_16x16
 
-mov si, 256
+mov si, 0x2300
 mov bx, 34
 mov cx, 0
 mov ah, 0xF1
@@ -270,9 +271,16 @@ clear_screen:
     pop cx
     ret
 
-; AX: sector index
+; AX: linear sector index
 ; ES:BX: destination
 read_linear_sector:
+    ; TODO: convert linear index to CHS
+    mov ah, 2
+    mov al, 1 ; number of sectors
+    mov dh, 0
+    mov cx, 1
+    mov dl, [boot_drive]
+    int 0x13
     ret
 
 boot_drive db 0
