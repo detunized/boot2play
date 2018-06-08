@@ -107,7 +107,8 @@ shr ch, 6
 inc cx
 mov [num_cylinders], cx
 
-mov ax, 0
+.load_and_show_sector:
+mov ax, [current_sector]
 mov bx, 0x09E0
 mov es, bx
 xor bx, bx
@@ -125,6 +126,12 @@ mov bx, 34
 mov cx, 0
 mov ah, 0xF1
 call display_memory_dump_16x16
+
+xor ah, ah
+int 0x16
+
+inc word [current_sector]
+jmp .load_and_show_sector
 
 ; Halt
 halt:
@@ -297,6 +304,8 @@ boot_drive db 0
 num_heads db 0
 num_cylinders dw 0
 num_sectors_per_track db 0
+
+current_sector dw 0
 
 times 510 - ($ - $$) db 0
 db 0x55
