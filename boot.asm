@@ -99,6 +99,8 @@ mov [num_heads], dh
 and cl, (1 << 6) - 1
 mov [num_sectors_per_track], cl
 
+; Load a sector and display its content.
+; Wait for any key and move to the next one.
 .load_and_show_sector:
 mov ax, [current_sector]
 mov bx, 0x09E0
@@ -119,6 +121,7 @@ mov cx, 0
 mov ah, 0xF1
 call display_memory_dump_16x16
 
+; Wait for any key to be pressed
 xor ah, ah
 int 0x16
 
@@ -127,7 +130,7 @@ jmp .load_and_show_sector
 
 ; Halt
 halt:
-    jmp halt
+jmp halt
 
 ; AL: char
 ; AH: attr
