@@ -96,16 +96,8 @@ inc dh
 mov [num_heads], dh
 ; CX contains both cylinders and sectors per track
 ; Lower 6 bits contain number of sectors per track
-mov ax, cx
-and al, (1 << 6) - 1
-mov [num_sectors_per_track], al
-; Higher 8 bits contain lower 8 bits of max cylinder index
-; Bits 6 and 7 are the high order bits of max cylinder index
-; Adding 1 to convert to count
-ror cx, 8
-shr ch, 6
-inc cx
-mov [num_cylinders], cx
+and cl, (1 << 6) - 1
+mov [num_sectors_per_track], cl
 
 .load_and_show_sector:
 mov ax, [current_sector]
@@ -302,7 +294,6 @@ read_linear_sector:
 
 boot_drive db 0
 num_heads db 0
-num_cylinders dw 0
 num_sectors_per_track db 0
 
 current_sector dw 0
