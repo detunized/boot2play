@@ -20,16 +20,20 @@ debug: run-requirements build
 .PHONY: build
 build: build-requirements floppy.img
 
-floppy.img: boot.bin
+floppy.img: boot.bin 2ndstage.bin
 	dd bs=512 count=2880 if=/dev/zero of=floppy.img
 	mformat -i floppy.img -f 1440 -B boot.bin -N 0xDEADBEEF -v boot2play
+	mcopy -i floppy.img 2ndstage.bin ::2ndstage.bin
 
 boot.bin: boot.asm
 	nasm -f bin -o boot.bin boot.asm
 
+2ndstage.bin:
+	ruby -e "print 'DEADBEEF' * 100" > 2ndstage.bin
+
 .PHONY: clean
 clean:
-	rm -f boot.bin floppy.img
+	rm -f boot.bin 2ndstage.bin floppy.img
 
 .PHONY: run-requirements
 run-requirements:
