@@ -45,33 +45,34 @@ bootstrap:
 ; TODO: set up the registers and the stack
 
 ; Memory map (see https://wiki.osdev.org/Memory_Map_(x86))
-; +-------------+--------+-----------------+
-; | Range       | Size   | Description     |
-; +-------------+--------+-----------------+
-; | 00000-003FF | 1024   | interrupt table |
-; | 00400-004FF | 256    | BIOS data area  |
-; | 00500-07BFF | 30464  | free memory     |
-; | 07C00-07DFF | 512    | boot sector     |
-; | 07E00-09CFF | 8192   | stack           |
-; | 09E00-7FFFF | 492032 | free memory     |
-; +----------------------------------------+
-
+; +-------------+--------+-------------------+-----------------+
+; | Range       | Size   | Offset from 7C000 | Description     |
+; +-------------+--------+-------------------+-----------------+
+; | 00000-003FF | 1024   | -                 | interrupt table |
+; | 00400-004FF | 256    | -                 | BIOS data area  |
+; | 00500-07BFF | 30464  | -                 | free memory     |
+; | 07C00-07DFF | 512    | 0                 | boot sector     |
+; | 07E00-09CFF | 8192   | 512 or 0x200      | stack           |
+; | 09E00-7FFFF | 492032 | 8704 or 0x2200    | free memory     |
+; +-------------+--------+-------------------+-----------------+
 
 ; Set up DS to 07C0:0000. It's also possible to use 0000:7C00
 ; but then we would need to offset this code via ORG.
-; Next 8kb after this boot sector is the stack 07E0:0000-07E0:1FFF
+; Next 8kb after this boot sector is the stack.
+; All segment registers are the equal.
 cli
 mov ax, 0x07C0
 mov ds, ax
-mov ax, 0x07E0
+mov es, ax
 mov ss, ax
-mov sp, 8192
+mov sp, 0x2200
 sti
 
 ; On boot the boot drive index is stored in DL
 mov [boot_drive], dl
 
-; FS is 0xB800 through out the entire program
+; FS is 0xB800 through out the entire program.
+; This is only needed for direct screen output routines.
 mov ax, 0xB800
 mov fs, ax
 
@@ -82,12 +83,18 @@ cld
 mov ax, 0x0720
 call clear_screen
 
+; Set cursor to 0:0
+mov ah, 2
+xor bh, bh
+xor dx, dx
+int 0x10
+
 ; Read drive parameters
+push es ; ES:DI will be overwritten
 mov ah, 0x08
 mov dl, [boot_drive]
-xor di, di
-mov es, di
 int 0x13
+pop es
 jc halt
 
 ; Store disk parameters
@@ -99,34 +106,79 @@ mov [num_heads], dh
 and cl, (1 << 6) - 1
 mov [num_sectors_per_track], cl
 
-; Load a sector and display its content.
-; Wait for any key and move to the next one.
-.load_and_show_sector:
-mov ax, [current_sector]
-mov bx, 0x09E0
-mov es, bx
-xor bx, bx
+;
+; Iterate over root directory to find "2ndstage.bin"
+;
+
+mov bp, sp
+mov ax, 19          ; Root directory starts at sector 19
+push ax             ; sector: bp - 2
+
+.next_sector:
+mov bx, 0x2200
 call read_linear_sector
-jc halt
 
-mov si, 0x2200 ; 09E0:0000 = 07C0:2200 = ds:2200
-mov bx, 0
-mov cx, 0
-mov ah, 0xF1
-call display_memory_dump_16x16
+; Scan all entries for "2NDSTAGEBIN"
+mov dx, 16
 
-mov si, 0x2300
-mov bx, 34
-mov cx, 0
-mov ah, 0xF1
-call display_memory_dump_16x16
+.next_entry:
 
-; Wait for any key to be pressed
-xor ah, ah
-int 0x16
+; When the first byte of the name is 0,
+; the rest of the entries should be skipped.
+cmp byte [bx], 0
+je .skip_remainig_entries
 
-inc word [current_sector]
-jmp .load_and_show_sector
+; print filename
+mov cx, 11
+mov si, bx
+.print_char:
+lodsb
+mov ah, 0x0E
+int 0x10
+loop .print_char
+
+; print CR+LF
+mov al, 13
+int 0x10
+mov al, 10
+int 0x10
+
+; Compare filenames
+mov cx, 11
+lea si, [second_stage_name]
+mov di, bx
+repe cmpsb
+je .check_file_attributes
+
+; Move to the next entry
+add bx, 32
+dec dx
+jnz .next_entry
+
+.skip_remainig_entries:
+mov ax, [bp - 2]
+inc ax
+mov [bp - 2], ax
+cmp ax, 32          ; Root directory ends at sector 32
+jle .next_sector
+
+; Done: nothing found.
+jmp .done
+
+.check_file_attributes:
+; This should be a regular file.
+; Volume label (0x08) and directory (0x10) attributes should not be set.
+test byte [bx + 11], 0x18
+jnz halt
+
+; The file is found
+mov ax, 0x1721
+call clear_screen
+
+.done:
+mov sp, bp
+
+jmp halt
 
 ; Halt
 halt:
@@ -134,142 +186,17 @@ jmp halt
 
 ; AL: char
 ; AH: attr
-; BX: x
-; CX: y
-; FS: 0xB800
-put_char:
-    shl bx, 1  ; bx = x * 2
-    shl cx, 5
-    add bx, cx ; bx = x * 2 + y * 32
-    shl cx, 2
-    add bx, cx ; bx = x * 2 + y * (32 + 128)
-    mov [fs:bx], ax
-    ret
-
-; AL: nibble (upper 4 bits must be zero)
-; AH: attr
-; BX: x
-; CX: y
-; FS: 0xB800
-put_hex_nibble:
-    add al, '0'
-    cmp al, '9'
-    jle .call_put_char
-    add al, 'A' - '0' - 10
-.call_put_char:
-    jmp put_char ; tail call
-
-; AL: byte
-; AH: attr
-; BX: x
-; CX: y
-; FS: 0xB800
-put_hex_byte:
-    push cx
-    push bx
-    push ax
-    shr al, 4
-    call put_hex_nibble
-    pop ax
-    and al, 0x0F
-    pop bx
-    inc bx
-    pop cx
-    jmp put_hex_nibble ; tail call
-
-; DX: word
-; AH: attr
-; BX: x
-; CX: y
-; FS: 0xB800
-put_hex_word:
-    push dx
-    push cx
-    push bx
-    push ax
-    mov al, dh
-    call put_hex_byte
-    pop ax
-    pop bx
-    pop cx
-    pop dx
-    mov al, dl
-    add bx, 2
-    jmp put_hex_byte; tail call
-
-; SI: bytes
-; DX: length
-; AH: attr
-; BX: x
-; CX: y
-; FS: 0xB800
-put_hex_string:
-    push di
-    mov di, ax
-.loop:
-    or dx, dx
-    jz .done
-    push cx
-    push bx
-    mov ax, di
-    mov al, [ds:si]
-    call put_hex_byte
-    pop bx
-    add bx, 2
-    pop cx
-    inc si
-    dec dx
-    jmp .loop
-.done:
-    pop di
-    ret
-
-; DS:SI: bytes
-; AH: attr
-; BX: x
-; CX: y
-; FS: 0xB800
-display_memory_dump_16x16:
-; Print memory dump of [0x00400, 0x00500)
-    push bp
-    mov bp, sp
-
-    push bx ; x:     bp - 2
-    push cx ; y:     bp - 4
-    push 0  ; row:   bp - 6
-    push si ; bytes: bp - 8
-    push ax ; attr:  bp - 10
-
-    .row:
-    mov bx, [bp - 2]; x
-    mov cx, [bp - 4]; y
-    add cx, [bp - 6]; y + row
-    mov dx, 16
-    mov si, [bp - 8]
-    mov ax, [bp - 10]
-    call put_hex_string
-
-    add word [bp - 8], 16
-
-    inc word [bp - 6]
-    cmp word [bp - 6], 16
-    jl .row
-
-    mov sp, bp
-    pop bp
-    ret
-
-; AL: char
-; AH: attr
-; FS: 0xB800
 clear_screen:
     push cx
+    push di
     push es
-    mov cx, fs
+    mov cx, 0xB800
     mov es, cx
     mov cx, 80 * 25
+    xor di, di
     repne stosw
     pop es
+    pop di
     pop cx
     ret
 
@@ -298,8 +225,7 @@ read_linear_sector:
 boot_drive db 0
 num_heads db 0
 num_sectors_per_track db 0
-
-current_sector dw 0
+second_stage_name db "2NDSTAGEBIN"
 
 times 510 - ($ - $$) db 0
 db 0x55
