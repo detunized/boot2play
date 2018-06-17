@@ -131,17 +131,7 @@ je .skip_remainig_entries
 ; print filename
 mov cx, 11
 mov si, bx
-.print_char:
-lodsb
-mov ah, 0x0E
-int 0x10
-loop .print_char
-
-; print CR+LF
-mov al, 13
-int 0x10
-mov al, 10
-int 0x10
+call puts
 
 ; Compare filenames
 mov cx, 11
@@ -221,6 +211,8 @@ read_linear_sector:
     pop dx
     pop cx
     ret
+
+%include "bios-screen-output.asm"
 
 boot_drive db 0
 num_heads db 0
