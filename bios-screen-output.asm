@@ -1,4 +1,13 @@
 ; In:
+;         AL: char
+print_char:
+    push ax
+    mov ah, 0x0E
+    int 0x10
+    pop ax
+    ret
+
+; In:
 ;     DS:SI: buffer
 ;        CX: length
 ; Out:

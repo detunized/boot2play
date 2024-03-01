@@ -161,6 +161,21 @@ jmp .done
 test byte [bx + 11], 0x18
 jnz halt
 
+; Read the second stage
+mov ax, [bx + 26]
+add ax, 31
+mov ax, 19
+mov bx, 0x2200
+call read_linear_sector
+
+mov di, bx
+mov cx, 800
+call puts
+
+; HALT
+.again:
+jmp .again
+
 ; The file is found
 mov ax, 0x1721
 call clear_screen
